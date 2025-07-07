@@ -102,6 +102,21 @@ export const presets: Record<string, Preset> = {
     ],
     description: 'Update `appVersion` value in Helm chart `Chart.yaml`.',
   },
+  koVersions: {
+    customManagers: [
+      {
+        customType: 'regex',
+        datasourceTemplate: 'docker',
+        managerFilePatterns: ['/(^|/)\\.ko\\.ya?ml$/', '/(^|/)ko\\.ya?ml$/'],
+        matchStrings: [
+          'defaultBaseImage\\s*:\\s*(?<depName>[^:\\s]+?)(?::(?<currentValue>[^\\s]+?))?\\s*$',
+          '# renovate: datasource=docker\\s+[^\\s:]+\\s*:\\s*(?<depName>[^:\\s]+?)(?::(?<currentValue>[^\\s]+?))?\\s*$',
+        ],
+      },
+    ],
+    description:
+      'Update `defaultBaseImage` and images in `baseImageOverrides` in ko configuration files. For `baseImageOverrides`, add `# renovate: datasource=docker` comment above each image entry.',
+  },
   makefileVersions: {
     customManagers: [
       {

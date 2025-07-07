@@ -731,6 +731,95 @@ describe('config/presets/internal/custom-managers', () => {
     });
   });
 
+  describe('Update `defaultBaseImage` and `baseImageOverrides` in ko configuration files', () => {
+    const customManager = presets.koVersions.customManagers?.[0];
+
+    it(`find dependencies in file`, async () => {
+      const fileContent = codeBlock`
+        # ko configuration file
+        defaultBaseImage: build-harbor.alauda.cn/ops/distroless-static-nonroot:latest
+
+        baseImageOverrides:
+          # renovate: datasource=docker
+          github.com/my-user/my-repo/cmd/app: registry.example.com/base/for/app:v1.0.0
+          # renovate: datasource=docker
+          github.com/my-user/my-repo/cmd/foo: registry.example.com/base/for/foo:v2.0.0
+          # renovate: datasource=docker
+          github.com/my-user/my-repo/cmd/bar: gcr.io/distroless/static:nonroot
+
+        # Other configuration
+        builds:
+          - id: app
+            main: ./cmd/app
+      `;
+
+      const res = await extractPackageFile(
+        'regex',
+        fileContent,
+        '.ko.yaml',
+        customManager!,
+      );
+
+      expect(res?.deps).toMatchObject([
+        {
+          currentValue: 'latest',
+          datasource: 'docker',
+          depName: 'build-harbor.alauda.cn/ops/distroless-static-nonroot',
+          replaceString:
+            'defaultBaseImage: build-harbor.alauda.cn/ops/distroless-static-nonroot:latest',
+        },
+        {
+          currentValue: 'v1.0.0',
+          datasource: 'docker',
+          depName: 'registry.example.com/base/for/app',
+          replaceString:
+            '# renovate: datasource=docker\n  github.com/my-user/my-repo/cmd/app: registry.example.com/base/for/app:v1.0.0',
+        },
+        {
+          currentValue: 'v2.0.0',
+          datasource: 'docker',
+          depName: 'registry.example.com/base/for/foo',
+          replaceString:
+            '# renovate: datasource=docker\n  github.com/my-user/my-repo/cmd/foo: registry.example.com/base/for/foo:v2.0.0',
+        },
+        {
+          currentValue: 'nonroot',
+          datasource: 'docker',
+          depName: 'gcr.io/distroless/static',
+          replaceString:
+            '# renovate: datasource=docker\n  github.com/my-user/my-repo/cmd/bar: gcr.io/distroless/static:nonroot',
+        },
+      ]);
+    });
+
+    describe('matches regexes patterns', () => {
+      it.each`
+        path                  | expected
+        ${'.ko.yaml'}         | ${true}
+        ${'.ko.yml'}          | ${true}
+        ${'ko.yaml'}          | ${true}
+        ${'ko.yml'}           | ${true}
+        ${'foo/.ko.yaml'}     | ${true}
+        ${'foo/.ko.yml'}      | ${true}
+        ${'foo/ko.yaml'}      | ${true}
+        ${'foo/ko.yml'}       | ${true}
+        ${'foo/bar/.ko.yaml'} | ${true}
+        ${'foo/bar/.ko.yml'}  | ${true}
+        ${'foo/bar/ko.yaml'}  | ${true}
+        ${'foo/bar/ko.yml'}   | ${true}
+        ${'ko.json'}          | ${false}
+        ${'ko.toml'}          | ${false}
+        ${'ko-config.yaml'}   | ${false}
+        ${'kustomize.yaml'}   | ${false}
+        ${'ko.yaml.backup'}   | ${false}
+      `('$path', ({ path, expected }) => {
+        expect(
+          matchRegexOrGlobList(path, customManager!.managerFilePatterns),
+        ).toBe(expected);
+      });
+    });
+  });
+
   describe('finds dependencies in pom.xml properties', () => {
     const customManager = presets.mavenPropertyVersions.customManagers?.[0];
 
